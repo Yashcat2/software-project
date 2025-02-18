@@ -14,22 +14,26 @@ import { toast } from "sonner";
 import { Undo2, Redo2 } from 'lucide-react';
 import { FadingDots } from "react-cssfx-loading";
 
-// Define Specs type
-interface Specs {
-  power: string[];
-  resistance: string[];
-  tolerance: string[];
-}
+// Extend LibraryItem interface with canvas-specific properties
+// Update CanvasComponent to accept more complex types like specs
+// Assuming LibraryItem already has an index signature like this:
+// interface LibraryItem {
+//   [key: string]: string | number;
+// }
 
-// Updated CanvasComponent interface
-interface CanvasComponent extends Omit<LibraryItem, 'specs'> {
+interface CanvasComponent extends LibraryItem {
   x: number;
   y: number;
   instanceId: string;
-  description?: string;
-  specs?: Specs;
-  [key: string]: string | number | Specs | string[] | undefined;
+  specs?: { 
+    power: string[];
+    resistance: string[];
+    tolerance: string[];
+  }; // Optional specs property
+  // Allowing string or number for any other properties
+  [key: string]: string | number | { power: string[]; resistance: string[]; tolerance: string[] } | undefined;
 }
+
 
 interface HistoryAction {
   type: 'add' | 'remove' | 'move' | 'quantity';
@@ -62,17 +66,13 @@ const Workspace: React.FC<{ params: { fileId: string } }> = ({ params }) => {
         });
         
         if (state?.canvasComponents && state.canvasComponents.length > 0) {
+          // Transform the data to ensure it matches CanvasComponent interface
           const validComponents = state.canvasComponents.map(comp => ({
-            id: comp.id,
-            name: comp.name,
-            svg: comp.svg,
-            price: comp.price,
-            x: comp.x,
-            y: comp.y,
-            instanceId: comp.instanceId,
-            description: comp.description,
-            specs: comp.specs,
-          })) as CanvasComponent[];
+            ...comp, // Spread all properties to maintain index signature compatibility
+            x: typeof comp.x === 'number' ? comp.x : 0,
+            y: typeof comp.y === 'number' ? comp.y : 0,
+            instanceId: comp.instanceId || `${comp.id}-${Date.now()}`
+          }));
           
           setComponents(validComponents);
           setHistory([{ type: 'add', components: validComponents }]);
@@ -107,7 +107,8 @@ const Workspace: React.FC<{ params: { fileId: string } }> = ({ params }) => {
       ...component,
       x: Math.random() * 500 + 50,
       y: Math.random() * 300 + 50,
-      instanceId: `${component.id}-${Date.now()}-${Math.random()}`
+      instanceId: `${component.id}-${Date.now()}-${Math.random()}`,
+      specs: component.specs // Assuming specs is optional in LibraryItem
     };
 
     setComponents(prev => {
@@ -117,33 +118,6 @@ const Workspace: React.FC<{ params: { fileId: string } }> = ({ params }) => {
         : [...prev, canvasComponent];
       
       addToHistory(newComponents, 'add', canvasComponent.instanceId);
-      return newComponents;
-    });
-  }, [addToHistory]);
-
-  const handleUpdateQuantity = useCallback((id: string, newQuantity: number) => {
-    setComponents(prev => {
-      const currentComponents = prev.filter(comp => comp.id === id);
-      const otherComponents = prev.filter(comp => comp.id !== id);
-      
-      let newComponents: CanvasComponent[];
-      if (newQuantity <= 0) {
-        newComponents = otherComponents;
-      } else if (newQuantity > currentComponents.length) {
-        const template = currentComponents[0];
-        const toAdd = newQuantity - currentComponents.length;
-        const newItems = Array(toAdd).fill(null).map(() => ({
-          ...template,
-          instanceId: `${template.id}-${Date.now()}-${Math.random()}`,
-          x: Math.random() * 500 + 50,
-          y: Math.random() * 300 + 50
-        }));
-        newComponents = [...otherComponents, ...currentComponents, ...newItems];
-      } else {
-        newComponents = [...otherComponents, ...currentComponents.slice(0, newQuantity)];
-      }
-      
-      addToHistory(newComponents, 'quantity', id);
       return newComponents;
     });
   }, [addToHistory]);

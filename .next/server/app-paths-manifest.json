@@ -1,5 +1,4 @@
 {
-  "/api/auth/[kindeAuth]/route": "app/api/auth/[kindeAuth]/route.js",
   "/page": "app/page.js",
   "/(routes)/dashboard/page": "app/(routes)/dashboard/page.js"
 }

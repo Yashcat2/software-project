@@ -21,6 +21,6 @@
       "@/*": ["./*"]
     }
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "app/(routes)/dashboard/_components/SideNavTopSection.jsx", "app/(routes)/workspace/_components/CanvasSidebar/Canvas2.js"],
+"include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", "**/*.jsx", ".next/types/**/*.ts"],
   "exclude": ["node_modules"]
 }
