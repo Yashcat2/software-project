@@ -1,5 +1,6 @@
 {
+  "/favicon.ico/route": "app/favicon.ico/route.js",
+  "/api/auth/[kindeAuth]/route": "app/api/auth/[kindeAuth]/route.js",
   "/page": "app/page.js",
-  "/(routes)/workspace/[fileId]/page": "app/(routes)/workspace/[fileId]/page.js",
   "/(routes)/dashboard/page": "app/(routes)/dashboard/page.js"
 }

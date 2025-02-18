@@ -1,4 +1,4 @@
-// File: D:\Projects\jan 15-final\PowerDrafter\app\api\auth\[kindeAuth]\route.js
+// File: D:\Projects\feb19\app\api\auth\[kindeAuth]\route.js
 import * as entry from '../../../../../../app/api/auth/[kindeAuth]/route.js'
 import type { NextRequest } from 'next/server.js'
 
