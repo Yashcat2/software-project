@@ -14,26 +14,11 @@ import { toast } from "sonner";
 import { Undo2, Redo2 } from 'lucide-react';
 import { FadingDots } from "react-cssfx-loading";
 
-// Extend LibraryItem interface with canvas-specific properties
-// Update CanvasComponent to accept more complex types like specs
-// Assuming LibraryItem already has an index signature like this:
-// interface LibraryItem {
-//   [key: string]: string | number;
-// }
-
 interface CanvasComponent extends LibraryItem {
   x: number;
   y: number;
   instanceId: string;
-  specs?: { 
-    power: string[];
-    resistance: string[];
-    tolerance: string[];
-  }; // Optional specs property
-  // Allowing string or number for any other properties
-  [key: string]: string | number | { power: string[]; resistance: string[]; tolerance: string[] } | undefined;
 }
-
 
 interface HistoryAction {
   type: 'add' | 'remove' | 'move' | 'quantity';
@@ -42,22 +27,27 @@ interface HistoryAction {
   previousState?: CanvasComponent[];
 }
 
+
+
 const Workspace: React.FC<{ params: { fileId: string } }> = ({ params }) => {
   const convex = useConvex();
   const [components, setComponents] = useState<CanvasComponent[]>([]);
   const [draggedImage, setDraggedImage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
   const [showBudgetCalculator, setShowBudgetCalculator] = useState(true);
 
   const toggleBudgetCalculator = useCallback(() => {
     setShowBudgetCalculator(prev => !prev);
   }, []);
 
-  const [history, setHistory] = useState<HistoryAction[]>([]);
-  const [currentStep, setCurrentStep] = useState(-1);
+ // History states with action type
+ const [history, setHistory] = useState<HistoryAction[]>([]);
+ const [currentStep, setCurrentStep] = useState(-1);
 
-  useEffect(() => {
+
+   useEffect(() => {
     const loadState = async () => {
       try {
         setLoading(true);
@@ -65,17 +55,9 @@ const Workspace: React.FC<{ params: { fileId: string } }> = ({ params }) => {
           fileId: params.fileId as Id<"files">
         });
         
-        if (state?.canvasComponents && state.canvasComponents.length > 0) {
-          // Transform the data to ensure it matches CanvasComponent interface
-          const validComponents = state.canvasComponents.map(comp => ({
-            ...comp, // Spread all properties to maintain index signature compatibility
-            x: typeof comp.x === 'number' ? comp.x : 0,
-            y: typeof comp.y === 'number' ? comp.y : 0,
-            instanceId: comp.instanceId || `${comp.id}-${Date.now()}`
-          }));
-          
-          setComponents(validComponents);
-          setHistory([{ type: 'add', components: validComponents }]);
+        if (state?.canvasComponents?.length > 0) {
+          setComponents(state.canvasComponents);
+          setHistory([{ type: 'add', components: state.canvasComponents }]);
           setCurrentStep(0);
         }
       } catch (error) {
@@ -90,10 +72,10 @@ const Workspace: React.FC<{ params: { fileId: string } }> = ({ params }) => {
     }
   }, [convex, params.fileId]);
 
-  const addToHistory = useCallback((newComponents: CanvasComponent[], actionType: HistoryAction['type'], componentId?: string) => {
+  const addToHistory = useCallback((newComponents: CanvasComponent[], actionType: string, componentId?: string) => {
     const previousState = components;
     setHistory(prev => [...prev.slice(0, currentStep + 1), {
-      type: actionType,
+      type: actionType as 'add' | 'remove' | 'move' | 'quantity',
       components: newComponents,
       componentId,
       previousState
@@ -102,25 +84,52 @@ const Workspace: React.FC<{ params: { fileId: string } }> = ({ params }) => {
     setComponents(newComponents);
   }, [currentStep, components]);
 
-  const handleComponentAdd = useCallback((component: LibraryItem) => {
-    const canvasComponent: CanvasComponent = {
-      ...component,
-      x: Math.random() * 500 + 50,
-      y: Math.random() * 300 + 50,
-      instanceId: `${component.id}-${Date.now()}-${Math.random()}`,
-      specs: component.specs // Assuming specs is optional in LibraryItem
-    };
 
+  const handleComponentAdd = useCallback((component: CanvasComponent, actionType: string) => {
     setComponents(prev => {
-      const existingIndex = prev.findIndex(comp => comp.instanceId === canvasComponent.instanceId);
-      const newComponents = existingIndex !== -1
-        ? prev.map((comp, index) => index === existingIndex ? canvasComponent : comp)
-        : [...prev, canvasComponent];
+      const existingIndex = prev.findIndex(comp => comp.instanceId === component.instanceId);
+      let newComponents;
       
-      addToHistory(newComponents, 'add', canvasComponent.instanceId);
+      if (existingIndex !== -1) {
+        newComponents = [...prev];
+        newComponents[existingIndex] = component;
+      } else {
+        newComponents = [...prev, component];
+      }
+      
+      addToHistory(newComponents, actionType, component.instanceId);
       return newComponents;
     });
   }, [addToHistory]);
+
+
+   const handleUpdateQuantity = useCallback((id: string, newQuantity: number) => {
+    setComponents(prev => {
+      const currentComponents = prev.filter(comp => comp.id === id);
+      const otherComponents = prev.filter(comp => comp.id !== id);
+      
+      let newComponents;
+      if (newQuantity <= 0) {
+        newComponents = otherComponents;
+      } else if (newQuantity > currentComponents.length) {
+        const template = currentComponents[0];
+        const toAdd = newQuantity - currentComponents.length;
+        const newItems = Array(toAdd).fill(null).map(() => ({
+          ...template,
+          instanceId: `${template.id}-${Date.now()}-${Math.random()}`,
+          x: Math.random() * 500 + 50,
+          y: Math.random() * 300 + 50
+        }));
+        newComponents = [...otherComponents, ...currentComponents, ...newItems];
+      } else {
+        newComponents = [...otherComponents, ...currentComponents.slice(0, newQuantity)];
+      }
+      
+      addToHistory(newComponents, 'quantity', id);
+      return newComponents;
+    });
+  }, [addToHistory]);
+
 
   const handleRemoveItem = useCallback((id: string) => {
     setComponents(prev => {
@@ -150,7 +159,7 @@ const Workspace: React.FC<{ params: { fileId: string } }> = ({ params }) => {
     try {
       setSaving(true);
       const budget = {
-        total: components.reduce((sum, item) => Number(sum) + Number(item.price), 0),
+        total: components.reduce((sum, item) => sum + item.price, 0),
         items: Array.from(
           components.reduce((map, item) => {
             const existing = map.get(item.id);
@@ -187,6 +196,7 @@ const Workspace: React.FC<{ params: { fileId: string } }> = ({ params }) => {
   if (loading) {
     return <div className="flex items-center justify-center h-screen"><FadingDots width="50px" height="50px" duration="0.3s"/></div>;
   }
+  
 
   return (
     <div>
@@ -210,6 +220,7 @@ const Workspace: React.FC<{ params: { fileId: string } }> = ({ params }) => {
         >
           <Redo2 size={20} />
         </button>
+        
       </div>
       
       <DndProvider backend={HTML5Backend}>
@@ -239,7 +250,8 @@ const Workspace: React.FC<{ params: { fileId: string } }> = ({ params }) => {
             />
           </div>
         </div>
-      </DndProvider>
+        </DndProvider>
+      
     </div>
   );
 };
